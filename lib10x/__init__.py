@@ -1,2 +1,2 @@
-name = 'lib10x'
 from lib10x.lib10x import *
+from lib10x.sample import *

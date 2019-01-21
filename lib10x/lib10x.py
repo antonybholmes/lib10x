@@ -196,8 +196,8 @@ def pca_plot(pca, clusters, pc1=1, pc2=2, marker='o', s=MARKER_SIZE, w=8, h=8, f
     return fig, ax
     
     
-def create_pca_plot(pca, clusters, name, pc1=1, pc2=2, marker='o', s=MARKER_SIZE, w=8, h=8, fig=None, ax=None):
-    out = 'pca_{}_pc{}_vs_pc{}.pdf'.format(name, pc1, pc2)
+def create_pca_plot(pca, clusters, name, pc1=1, pc2=2, marker='o', s=MARKER_SIZE, w=8, h=8, fig=None, ax=None, dir='.'):
+    out = '{}/pca_{}_pc{}_vs_pc{}.pdf'.format(dir, name, pc1, pc2)
    
     fig, ax = pca_plot(pca, clusters, pc1=pc1, pc2=pc2, marker=marker, s=s, w=w, h=h, fig=fig, ax=ax)
     
@@ -250,8 +250,8 @@ def tsne_cluster_plot(tsne, clusters, marker='o', s=libplot.MARKER_SIZE, c=None,
     return fig, ax
 
 
-def create_tsne_cluster_plot(tsne_results, clusters, name, marker='o', s=libplot.MARKER_SIZE, w=8, h=8, legend=True, ax=None):
-    out = libtsne.get_tsne_plot_name(name)
+def create_tsne_cluster_plot(tsne_results, clusters, name, marker='o', s=libplot.MARKER_SIZE, w=8, h=8, legend=True, ax=None, dir='.'):
+    out = '{}/{}'.format(dir, libtsne.get_tsne_plot_name(name))
       
     return tsne_cluster_plot(tsne_results, clusters, marker=marker, s=s, w=w, h=h, legend=legend, out=out)
 
@@ -335,6 +335,12 @@ def base_expr_plot(data,
     
     if ax is None:
       fig, ax = libplot.new_fig(w=w, h=h)
+      
+    #if norm is None and exp.min() < 0:
+    #norm = matplotlib.colors.Normalize(vmin=-3, vmax=3, clip=True)
+        
+    if norm is None:
+        norm = matplotlib.colors.Normalize(vmin=-3, vmax=3, clip=True)
     
     # Sort by expression level
     idx = np.argsort(exp)
@@ -343,12 +349,19 @@ def base_expr_plot(data,
     y = data['{}-{}'.format(t, d2)][idx]
     e = exp[idx]
     
+    if (e.min() == 0):
+        print('Data does not appear to be z-scored. Transforming now...')
+        # zscore
+        e = (e - e.mean()) / e.std()
+        
+        print(e.min(), e.max())
+    
     # z-score
     #e = (e - e.mean()) / e.std()
     
     # limit to 3 std for z-scores
-    e[e < -3] = -3
-    e[e > 3] = 3
+    #e[e < -3] = -3
+    #e[e > 3] = 3
     
     ax.scatter(x, y, c=e, s=s, marker=marker, alpha=alpha, cmap=cmap, norm=norm, edgecolors=edgecolors)
     
@@ -383,6 +396,9 @@ def expr_plot(data,
     if ax is None:
       fig, ax = libplot.new_fig(w, h)
       is_first = True
+    
+    if norm is None:
+        norm = matplotlib.colors.Normalize(vmin=-3, vmax=3, clip=True)
     
     base_expr_plot(data, 
                    exp, 
@@ -688,9 +704,11 @@ def tsne_genes_expr(data,
                     genes, 
                     prefix='',
                     index=None,
+                    dir='GeneExp',
                     cmap=BLUE_YELLOW_CMAP,
                     w=libplot.DEFAULT_WIDTH,
-                    h=libplot.DEFAULT_HEIGHT):
+                    h=libplot.DEFAULT_HEIGHT,
+                    format='pdf'):
     """
     Plot multiple genes on a grid.
     
@@ -703,6 +721,12 @@ def tsne_genes_expr(data,
     genes : array
         List of gene names
     """
+    
+    if dir[-1] == '/':
+        dir = dir[:-1]
+    
+    if not os.path.exists(dir):
+        mkdir(dir)
     
     if index is None:
         index = data.index
@@ -732,9 +756,9 @@ def tsne_genes_expr(data,
         #libplot.add_colorbar(fig, cmap)
         
         if gene_id != gene:
-            out = 'tsne_{}_expr_{}_{}.pdf'.format(prefix, gene, gene_id)
+            out = '{}/tsne_{}_expr_{}_{}.{}'.format(dir, prefix, gene, gene_id, format)
         else:
-            out = 'tsne_{}_expr_{}.pdf'.format(prefix, gene)
+            out = '{}/tsne_{}_expr_{}.{}'.format(dir, prefix, gene, format)
         
         print('making', out)
         
@@ -758,10 +782,6 @@ def tsne_gene_expr(data, tsne, gene, fig=None, ax=None, cmap=plt.cm.plasma, out=
         
     exp = get_gene_data(data, gene)
     
-    print("z", np.min(exp), np.max(exp))
-    
-    #sns.distplot(exp)
-
     return tsne_expr_plot(tsne, exp, fig=fig, ax=ax, cmap=cmap, out=out)
         
         
@@ -821,9 +841,11 @@ def tsne_cluster_grid(tsne, clusters, colors=None, size=SUBPLOT_SIZE):
     return fig
 
 
-def create_tsne_cluster_grid(tsne, clusters, name, colors=None, size=SUBPLOT_SIZE):
+def create_tsne_cluster_grid(tsne, clusters, name, colors=None, size=SUBPLOT_SIZE, dir='.'):
     fig = tsne_cluster_grid(tsne, clusters, colors, size)
-    libplot.savefig(fig, 'tsne_{}_separate_clusters.pdf'.format(name))
+    
+    libplot.savefig(fig, '{}/tsne_{}_separate_clusters.png'.format(dir, name))
+    libplot.savefig(fig, '{}/tsne_{}_separate_clusters.pdf'.format(dir, name))
 
 
 
@@ -890,19 +912,21 @@ def umi_norm_log2(data):
         return (d + 1).apply(np.log2)
 
 
-def umi_norm_log2_scale(data):
-    d = umi_norm_log2(data).T
-    
+def scale(d):
     if isinstance(d, SparseDataFrame):
         print('UMI norm log2 scale sparse')
-        sd = StandardScaler(with_mean=False).fit_transform(d.matrix)
+        sd = StandardScaler(with_mean=False).fit_transform(d.T.matrix)
         
-        return SparseDataFrame(sd.T, index=data.index, columns=data.columns)
+        return SparseDataFrame(sd.T, index=d.index, columns=d.columns)
     else:
-        print(np.max(np.max(d)))
-        sd = StandardScaler().fit_transform(d)
+        sd = StandardScaler().fit_transform(d.T)
     
-        return pd.DataFrame(sd.T, index=data.index, columns=data.columns)
+        return pd.DataFrame(sd.T, index=d.index, columns=d.columns)
+
+def umi_norm_log2_scale(data):
+    d = umi_norm_log2(data)
+    
+    return scale(d)
 
 
 def read_clusters(file):
@@ -1021,51 +1045,96 @@ def knn_method_overlaps(tsne1, tsne2, clusters, name, k=5):
     df.set_index('Cluster', inplace=True)
     df.to_csv('{}_cluster_overlaps.txt'.format(name), sep='\t')
     
-    
-def create_merge_cluster_info(counts, clusters, name):
+
+def mkdir(path):
     """
-    Summarizes how many samples are in each cluster and from which experiment
-    they came.
+    Make dirs including any parents and avoid raising exception to work
+    more like mkdir -p
     
     Parameters
     ----------
-    counts : DataFrame
-        table of counts.
-    clusters : DataFrame
-        table of clusters.
-    name : str
-        prefix for file output
+    path : str
+        directory to create.
+    
     """
     
-    cids = sorted(set(clusters['Cluster'].tolist()))
+    try:
+        os.makedirs(path)
+    except:
+        pass
 
-    samples = np.repeat('xxxxxxx', counts.columns.shape[0])
-    samples[counts.columns.str.contains('-1')] = 'RK10001'
-    samples[counts.columns.str.contains('-2')] = 'RK10002'
-    samples[counts.columns.str.contains('-3')] = 'RK10003'
+def split_a_b(counts, w=6, h=6, format='pdf'):
+    """ 
+    Split cells into a and b
+    """
+    cache = True
     
-    sizes = {}
-    cluster_sample_sizes = collections.defaultdict(lambda : collections.defaultdict(int))
+    counts = libcluster.remove_empty_rows(counts)
     
-    for cid in cids:
-        sizes[cid] = clusters[clusters['Cluster'] == cid]['Cluster'].shape[0]
-        cluster_sample_sizes[cid]['RK10001'] = clusters[(clusters['Cluster'] == cid) & counts.columns.str.contains('-1')].shape[0]
-        cluster_sample_sizes[cid]['RK10002'] = clusters[(clusters['Cluster'] == cid) & counts.columns.str.contains('-2')].shape[0]
-        cluster_sample_sizes[cid]['RK10003'] = clusters[(clusters['Cluster'] == cid) & counts.columns.str.contains('-3')].shape[0]
+    genes = pd.read_csv('../../../../expression_genes.txt', header=0) # ['AICDA', 'CD83', 'CXCR4', 'MKI67', 'MYC', 'PCNA', 'PRDM1']
     
-    s1 = []
-    s2 = []
-    s3 = []
-    s4 = []
-    for i in range(0, counts.columns.shape[0]):
-        s1.append(cluster_sample_sizes[clusters['Cluster'][i]]['RK10001'])
-        s2.append(cluster_sample_sizes[clusters['Cluster'][i]]['RK10002'])
-        s3.append(cluster_sample_sizes[clusters['Cluster'][i]]['RK10003'])
-        s4.append(sizes[clusters['Cluster'][i]])
+    mkdir('a')
+    
+    a_barcodes = pd.read_csv('../a_barcodes.tsv', header=0, sep='\t')
+    idx = np.where(counts.columns.isin(a_barcodes['Barcode'].values))[0]
+    d_a = counts.iloc[:, idx]
+    d_a = libcluster.remove_empty_rows(d_a)
+    
+    if isinstance(d_a, SparseDataFrame):
+        d_a = umi_norm_log2(d_a)
+    else:
+        d_a = umi_norm_log2_scale(d_a)
+
+    pca_a = libtsne.load_pca(d_a, 'a', cache=cache) #pca.iloc[idx,:]
+    tsne_a = libtsne.load_pca_tsne(pca_a, 'a', cache=cache)
+    c_a = libtsne.load_phenograph_clusters(pca_a, 'a', cache=cache)
+    
+    create_pca_plot(pca_a, c_a, 'a', dir='a')
+    create_tsne_cluster_plot(tsne_a, c_a, 'a', dir='a')
+    create_tsne_cluster_grid(tsne_a, c_a, 'a', dir='a')
+    
+    tsne_genes_expr(d_a, tsne_a, genes, prefix='a_BGY', cmap=BLUE_GREEN_YELLOW_CMAP, w=w, h=h, dir='a/GeneExp', format=format)
+    
+    fig, ax = tsne_cluster_plot(tsne_a, c_a, legend=False, w=w, h=h)
+    libplot.savefig(fig, 'a/a_tsne_clusters_med.pdf')
+    
+    # b
+    
+    mkdir('b')
+    
+    b_barcodes = pd.read_csv('../b_barcodes.tsv', header=0, sep='\t')
+    idx = np.where(counts.columns.isin(b_barcodes['Barcode'].values))[0]
+    d_b = counts.iloc[:, idx]
+    d_b = libcluster.remove_empty_rows(d_b)
+    
+    if isinstance(d_a, SparseDataFrame):
+        d_b = umi_norm_log2(d_b)
+    else:
+        d_b = umi_norm_log2_scale(d_b)
         
-       
-    df = pd.DataFrame({'Barcode':counts.columns, 'Cluster':clusters['Cluster'], 'Sample':samples, 'RK10001 count':s1, 'RK10002 count':s2, 'RK10003 count':s3, 'Size':s4})
-    df = df[['Barcode', 'Cluster', 'Sample', 'RK10001 count', 'RK10002 count', 'RK10003 count', 'Size']]
-    df.to_csv('{}_cluster_info.txt'.format(name), sep='\t', header=True, index=False)
+    pca_b = libtsne.load_pca(d_b, 'b', cache=cache) #pca.iloc[idx_b,:]
+    tsne_b = libtsne.load_pca_tsne(pca_b, 'b', cache=cache)
+    c_b = libtsne.load_phenograph_clusters(pca_b, 'b', cache=cache)
+    
+    create_pca_plot(pca_b, c_b, 'b', dir='b')
+    create_tsne_cluster_plot(tsne_b, c_b, 'b', dir='b')
+    create_tsne_cluster_grid(tsne_b, c_b, 'b', dir='b')
+    
+    tsne_genes_expr(d_b, tsne_b, genes, prefix='b_BGY', cmap=BLUE_GREEN_YELLOW_CMAP, w=w, h=h, dir='b/GeneExp', format=format)
+    
+    fig, ax = tsne_cluster_plot(tsne_b, c_b, legend=False, w=w, h=h)
+    libplot.savefig(fig, 'b/b_tsne_clusters_med.pdf')
 
 
+
+def create_cluster_samples(tsne_umi_log2, clusters, sample_names, name, w=16, h=16):
+    sc = clusters.copy()
+    
+    c = 1
+    
+    for s in sample_names:
+        id = '-{}'.format(c)        
+        sc[sc.index.str.contains(id)] = s
+        c += 1
+        
+    create_tsne_cluster_plot(tsne_umi_log2, sc, name, w=w, h=w)
