@@ -44,7 +44,7 @@ def create_sample_clusters(tsne, labels):
     
     return df
 
-def create_merge_cluster_info(counts, clusters, name, sample_names=('RK10001', 'RK10002')):
+def create_merge_cluster_info(counts, clusters, name, sample_names=('RK10001', 'RK10002'), dir='.'):
     """
     Summarizes how many samples are in each cluster and from which experiment
     they came.
@@ -99,7 +99,7 @@ def create_merge_cluster_info(counts, clusters, name, sample_names=('RK10001', '
         df['Count {}'.format(sample_names[i])] = sample_counts[:, i]
     
     #df = df[['Barcode', 'Cluster', 'Sample', '{} count'.format(sample_names[0]), '{} count'.format(sample_names[1]), 'Size']]
-    df.to_csv('{}_cell_cluster_info.txt'.format(name), sep='\t', header=True, index=False)
+    df.to_csv('{}/{}_cell_cluster_info.txt'.format(dir, name), sep='\t', header=True, index=False)
     
     # table of cluster sizes
     
@@ -122,6 +122,6 @@ def create_merge_cluster_info(counts, clusters, name, sample_names=('RK10001', '
         df['Count {}'.format(sample_names[i])] = sample_counts[:, i]
     
     #df = df[['Barcode', 'Cluster', 'Sample', '{} count'.format(sample_names[0]), '{} count'.format(sample_names[1]), 'Size']]
-    df.to_csv('{}_cluster_info.txt'.format(name), sep='\t', header=True, index=False)
+    df.to_csv('{}/{}_cluster_info.txt'.format(dir, name), sep='\t', header=True, index=False)
     
 

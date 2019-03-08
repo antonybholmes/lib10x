@@ -25,6 +25,7 @@ import libcluster
 import libtsne
 import seaborn as sns
 from libsparse.libsparse import SparseDataFrame
+from lib10x.sample import *
 
 TNSE_AX_Q = 0.999
 
@@ -32,12 +33,16 @@ MARKER_SIZE = 10
 
 SUBPLOT_SIZE = 4
 EXP_ALPHA = 0.8
-BACKGROUND_SAMPLE_COLOR = (0.92, 0.92, 0.92, libplot.ALPHA)
+BACKGROUND_SAMPLE_COLOR = (0.92, 0.92, 0.92)
 BLUE_YELLOW_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('blue_yellow', ['#162d50', '#ffdd55'])
 BLUE_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('blue', ['#162d50', '#afc6e9'])
-BLUE_GREEN_YELLOW_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('blue', ['#162d50', '#214478', '#217844', '#ffcc00', '#ffdd55'])
+BLUE_GREEN_YELLOW_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#162d50', '#214478', '#217844', '#ffcc00', '#ffdd55'])
+#BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#000080', '#2ca05a', '#ffdd55'])
+BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#000055', '#008066', '#ffd42a'])
+                                                                       
 EXP_NORM = matplotlib.colors.Normalize(-1, 3, clip=True)
 
+CLUSTER_101_COLOR = (0.3, 0.3, 0.3)
 
 np.random.seed(0)
 
@@ -135,10 +140,10 @@ def tpm(gbm):
   return GeneBCMatrix(gbm.gene_ids, gbm.gene_names, gbm.barcodes, tpm)
 
 
-def create_tsne_cluster_plots(pca, labels, name, marker='o', s=MARKER_SIZE):
+def create_cluster_plots(pca, labels, name, marker='o', s=MARKER_SIZE):
     for i in range(0, pca.shape[1]):
         for j in range(i + 1, pca.shape[1]):
-            create_tsne_cluster_plot(pca, labels, name, pc1 = (i + 1), pc2 = (j + 1), marker=marker, s=s)
+            create_cluster_plot(pca, labels, name, pc1 = (i + 1), pc2 = (j + 1), marker=marker, s=s)
             
             
 def pca_base_plots(pca, clusters, n=10, marker='o', s=MARKER_SIZE):
@@ -162,7 +167,7 @@ def pca_base_plots(pca, clusters, n=10, marker='o', s=MARKER_SIZE):
 
 
 def pca_plot_base(pca, clusters, pc1=1, pc2=2, marker='o', s=MARKER_SIZE, w=8, h=8, fig=None, ax=None):
-    colors = libcluster.colors()
+    colors = libcluster.get_colors()
     
     if ax is None:
         fig, ax = libplot.new_fig(w=w, h=h)
@@ -209,27 +214,49 @@ def set_tsne_ax_lim(tsne, ax):
     Set the t-SNE x,y limits to look pretty.
     """
     
-    xlim = [tsne['TSNE-1'][tsne['TSNE-1'] < 0].quantile(1 - TNSE_AX_Q), tsne['TSNE-1'][tsne['TSNE-1'] >= 0].quantile(TNSE_AX_Q)]
-    ylim = [tsne['TSNE-2'][tsne['TSNE-2'] < 0].quantile(1 - TNSE_AX_Q), tsne['TSNE-2'][tsne['TSNE-2'] >= 0].quantile(TNSE_AX_Q)]
+    d1 = tsne.iloc[:, 0]
+    d2 = tsne.iloc[:, 1]
+    
+    xlim = [d1[d1 < 0].quantile(1 - TNSE_AX_Q), d1[d1 >= 0].quantile(TNSE_AX_Q)]
+    ylim = [d2[d2 < 0].quantile(1 - TNSE_AX_Q), d2[d2 >= 0].quantile(TNSE_AX_Q)]
     
     #print(xlim, ylim)
     
     #ax.set_xlim(xlim)
     #ax.set_ylim(ylim)
 
-def base_tsne_cluster_plot(tsne, clusters, marker='o', s=libplot.MARKER_SIZE, c=None, w=8, h=8, legend=True, fig=None, ax=None):
+def base_cluster_plot(tsne, 
+                           clusters, 
+                           markers=None, 
+                           s=libplot.MARKER_SIZE, 
+                           colors=None,
+                           edgecolors='none',
+                           w=8, 
+                           h=8,
+                           alpha=libplot.ALPHA,
+                           legend=True, 
+                           fig=None, 
+                           ax=None):
     """
     Create a tsne plot without the formatting
     """
     
     if ax is None:
         fig, ax = libplot.new_fig(w=w, h=h)
-    
-    libcluster.scatter_clusters(tsne['TSNE-1'], tsne['TSNE-2'], clusters, c=c, marker=marker, s=s, ax=ax)
+        
+    libcluster.scatter_clusters(tsne.iloc[:, 0], 
+                                tsne.iloc[:, 1], 
+                                clusters, 
+                                colors=colors, 
+                                edgecolors=edgecolors, 
+                                markers=markers, 
+                                alpha=alpha,
+                                s=s, 
+                                ax=ax)
     
     set_tsne_ax_lim(tsne, ax)
     
-    libcluster.format_axes(ax)
+    #libcluster.format_axes(ax)
     
     if legend:
         libcluster.format_legend(ax, cols=6, markerscale=2)
@@ -237,12 +264,13 @@ def base_tsne_cluster_plot(tsne, clusters, marker='o', s=libplot.MARKER_SIZE, c=
     return fig, ax
 
 
-def tsne_cluster_plot(tsne, clusters, marker='o', s=libplot.MARKER_SIZE, c=None, w=8, h=8, legend=True, fig=None, ax=None, out=None):
-    fig, ax = base_tsne_cluster_plot(tsne, clusters, marker=marker, c=c, s=s, w=w, h=h, legend=legend, fig=fig, ax=ax)
+def cluster_plot(tsne, clusters, markers='o', s=libplot.MARKER_SIZE, colors=None, w=8, h=8, legend=True, fig=None, ax=None, out=None):
+    fig, ax = base_cluster_plot(tsne, clusters, markers=markers, colors=colors, s=s, w=w, h=h, legend=legend, fig=fig, ax=ax)
     
     #libtsne.tsne_legend(ax, labels, colors)
-    libcluster.format_simple_axes(ax, title="t-SNE")
+    #libcluster.format_simple_axes(ax, title="t-SNE")
     #libcluster.format_legend(ax, cols=6, markerscale=2)
+    libplot.invisible_axes(ax)
     
     if out is not None:
         libplot.savefig(fig, out)
@@ -250,10 +278,23 @@ def tsne_cluster_plot(tsne, clusters, marker='o', s=libplot.MARKER_SIZE, c=None,
     return fig, ax
 
 
-def create_tsne_cluster_plot(tsne_results, clusters, name, marker='o', s=libplot.MARKER_SIZE, w=8, h=8, legend=True, ax=None, dir='.'):
-    out = '{}/{}'.format(dir, libtsne.get_tsne_plot_name(name))
-      
-    return tsne_cluster_plot(tsne_results, clusters, marker=marker, s=s, w=w, h=h, legend=legend, out=out)
+def create_cluster_plot(tsne_results, 
+                        clusters, 
+                        name,
+                        type='tsne',
+                        markers='o', 
+                        s=libplot.MARKER_SIZE, 
+                        w=8, 
+                        h=8, 
+                        legend=True, 
+                        ax=None,
+                        format='pdf',
+                        dir='.'):
+    out = '{}/{}_{}.{}'.format(dir, type, name, format) #libtsne.get_tsne_plot_name(name))
+    
+    print(out)
+    
+    return cluster_plot(tsne_results, clusters, markers=markers, s=s, w=w, h=h, legend=legend, out=out)
 
 
 def base_tsne_plot(tsne, marker='o', s=libplot.MARKER_SIZE, c='red', label=None, fig=None, ax=None):
@@ -342,8 +383,8 @@ def base_expr_plot(data,
     if norm is None:
         norm = matplotlib.colors.Normalize(vmin=-3, vmax=3, clip=True)
     
-    # Sort by expression level
-    idx = np.argsort(exp)
+    # Sort by expression level so that extreme values always appear on top
+    idx = np.argsort(abs(exp)) #np.argsort(exp)
     
     x = data['{}-{}'.format(t, d1)][idx]
     y = data['{}-{}'.format(t, d2)][idx]
@@ -365,7 +406,7 @@ def base_expr_plot(data,
     
     ax.scatter(x, y, c=e, s=s, marker=marker, alpha=alpha, cmap=cmap, norm=norm, edgecolors=edgecolors)
     
-    libcluster.format_axes(ax, title=t)
+    #libcluster.format_axes(ax, title=t)
     
     return fig, ax
 
@@ -397,9 +438,7 @@ def expr_plot(data,
       fig, ax = libplot.new_fig(w, h)
       is_first = True
     
-    if norm is None:
-        norm = matplotlib.colors.Normalize(vmin=-3, vmax=3, clip=True)
-    
+
     base_expr_plot(data, 
                    exp, 
                    d1=d1, 
@@ -414,7 +453,8 @@ def expr_plot(data,
                    h=h,
                    ax=ax)
     
-    if colorbar or is_first:
+    #if colorbar or is_first:
+    if colorbar:
         libplot.add_colorbar(fig, cmap, norm=norm)
         #libcluster.format_simple_axes(ax, title=t)
   
@@ -470,7 +510,7 @@ def tsne_expr_plot(tsne,
     libplot.invisible_axes(ax)    
 
     if out is not None:
-        libplot.savefig(fig, out)
+        libplot.savefig(fig, out, pad=0)
     
     return fig, ax
 
@@ -636,7 +676,7 @@ def get_gene_data(data, g, ids=None, gene_names=None):
             return []
        
     if isinstance(data, SparseDataFrame):   
-        return data[idx, :].toarray()
+        return data[idx, :].to_array()
     else:
         return data.iloc[idx, :].values
     
@@ -706,8 +746,10 @@ def tsne_genes_expr(data,
                     index=None,
                     dir='GeneExp',
                     cmap=BLUE_YELLOW_CMAP,
+                    norm=None,
                     w=libplot.DEFAULT_WIDTH,
                     h=libplot.DEFAULT_HEIGHT,
+                    colorbar=True,
                     format='pdf'):
     """
     Plot multiple genes on a grid.
@@ -733,6 +775,10 @@ def tsne_genes_expr(data,
     
     if type(genes) is pd.core.frame.DataFrame:
         genes = genes['Genes'].values
+        
+    if norm is None:
+        norm = matplotlib.colors.Normalize(vmin=-3, vmax=3, clip=True)
+    
     
     #cmap = plt.cm.plasma
     
@@ -756,13 +802,11 @@ def tsne_genes_expr(data,
         #libplot.add_colorbar(fig, cmap)
         
         if gene_id != gene:
-            out = '{}/tsne_{}_expr_{}_{}.{}'.format(dir, prefix, gene, gene_id, format)
+            out = '{}/tsne_expr_{}_{}.{}'.format(dir, gene, gene_id, format)
         else:
-            out = '{}/tsne_{}_expr_{}.{}'.format(dir, prefix, gene, format)
-        
-        print('making', out)
-        
-        fig, ax = tsne_expr_plot(tsne, exp, cmap=cmap, out=out, w=w, h=h)
+            out = '{}/tsne_expr_{}.{}'.format(dir, gene, format)
+
+        fig, ax = tsne_expr_plot(tsne, exp, cmap=cmap, out=out, w=w, h=h, colorbar=colorbar, norm=norm)
         plt.close(fig)
         
 
@@ -784,10 +828,261 @@ def tsne_gene_expr(data, tsne, gene, fig=None, ax=None, cmap=plt.cm.plasma, out=
     
     return tsne_expr_plot(tsne, exp, fig=fig, ax=ax, cmap=cmap, out=out)
         
+
+def tsne_separate_cluster(tsne,
+                          clusters,
+                          cluster,
+                          colors=None,
+                          add_titles=True,
+                          size=4,
+                          fig=None,
+                          ax=None):
+    """
+    Plot a cluster separately to highlight where the samples are
+    
+    Parameters
+    ----------
+    tsne : Pandas dataframe
+        Cells x tsne tsne data. Columns should be labeled 'TSNE-1', 'TSNE-2' etc
+    cluster : int
+        Clusters in 
+    colors : list, color
+        Colors of points
+    add_titles : bool
+        Whether to add titles to plots
+    w: int, optional
+        width of new ax.
+    h: int, optional
+        height of new ax.
+    
+    Returns
+    -------
+    fig : Matplotlib figure
+        A new Matplotlib figure used to make the plot
+    ax : Matplotlib axes
+        Axes used to render the figure
+    """
+    
+    if ax is None:
+      fig, ax = libplot.new_fig(size, size)
+    
+
+    if colors is None:
+        colors = libcluster.get_colors()
+    
+
+    #print('Label {}'.format(l))
+    idx1 = np.where(clusters['Cluster'] == cluster)[0]
+    idx2 = np.where(clusters['Cluster'] != cluster)[0]
+    
+    # Plot background points
+    
+    x = tsne.iloc[idx2, 0]
+    y = tsne.iloc[idx2, 1]
+    libplot.scatter(x, y, c=BACKGROUND_SAMPLE_COLOR, ax=ax)
+    
+    # Plot cluster over the top of the background
+    
+    x = tsne.iloc[idx1, 0]
+    y = tsne.iloc[idx1, 1]
+    
+    if isinstance(colors, dict):
+        color = colors[cluster]
+    elif isinstance(colors, list):
+        if cluster <= len(colors):
+            color = colors[cluster - 1] #np.where(clusters['Cluster'] == cluster)[0]]
+        else:
+            color = CLUSTER_101_COLOR
+    else:
+        color = 'black'
         
-def tsne_cluster_grid(tsne, clusters, colors=None, size=SUBPLOT_SIZE):
+    print('sep', cluster, color)
+    
+    libplot.scatter(x, y, c=color, ax=ax)
+
+    if add_titles:
+        if isinstance(cluster, int):
+            prefix = 'C'
+        else:
+            prefix = ''
+            
+        ax.set_title('{}{} ({:,})'.format(prefix, cluster, len(idx1)), color=color)
+            
+    
+    ax.axis('off') #libplot.invisible_axes(ax)
+            
+    return fig, ax
+
+
+def tsne_separate_clusters(tsne,
+                      clusters,
+                      name,
+                      colors=None,
+                      size=4,
+                      add_titles=True,
+                      format='pdf'):
+    """
+    Plot separate clusters into separate plots
+    """
+    
+    ids = list(sorted(set(clusters['Cluster'])))
+    
+    indices = np.array(list(range(0, len(ids))))
+
+    if colors is None:
+        colors = libcluster.get_colors()
+    
+    for i in indices:
+        print('index', i)
+        cluster = ids[i]
+        
+        fig, ax = tsne_separate_cluster(tsne,
+                          clusters,
+                          cluster,
+                          colors=colors,
+                          add_titles=add_titles,
+                          size=size)
+    
+        out = 'tsne_sep_clust_{}_c{}.{}'.format(name, cluster, format)
+        
+        print('Creating', out, '...')
+        
+        libplot.savefig(fig, out)
+        plt.close(fig)
+
+        
+def cluster_grid(tsne,
+                      clusters,
+                      colors=None,
+                      cols=-1,
+                      size=SUBPLOT_SIZE,
+                      add_titles=True,
+                      cluster_order=None):
     """
     Plot each cluster separately to highlight where the samples are
+    
+    Parameters
+    ----------
+    tsne : Pandas dataframe
+        Cells x tsne tsne data. Columns should be labeled 'TSNE-1', 'TSNE-2' etc
+    clusters : DataFrame
+        Clusters in 
+    colors : list, color
+        Colors of points
+    add_titles : bool
+        Whether to add titles to plots
+    plot_order: list, optional
+        List of cluster ids in the order they should be rendered
+        
+    Returns
+    -------
+    fig : Matplotlib figure
+        A new Matplotlib figure used to make the plot
+    """
+    
+    ids = list(sorted(set(clusters['Cluster'])))
+    
+    if cluster_order is not None:
+        indices = np.array(cluster_order) - 1
+    else:
+        indices = np.array(list(range(0, len(ids))))
+    
+    n = indices.size
+    
+    if cols == -1:
+        cols = int(np.ceil(np.sqrt(n)))
+    
+    rows = int(np.ceil(n / cols))
+    
+    
+    w = size * cols
+    h = size * rows
+     
+    fig = libplot.new_base_fig(w=w, h=h)
+    
+    if colors is None:
+        colors = libcluster.get_colors()
+    
+    # Where to plot figure
+    pc = 1
+    
+    for i in indices:
+        
+        cluster = ids[i]
+        
+        print('index', i, cluster)
+        
+        ax = libplot.new_ax(fig, subplot=(rows, cols, pc))
+        
+        tsne_separate_cluster(tsne,
+                          clusters,
+                          cluster,
+                          colors=colors,
+                          add_titles=add_titles,
+                          ax=ax)
+        
+#        idx1 = np.where(clusters['Cluster'] == cluster)[0]
+#        idx2 = np.where(clusters['Cluster'] != cluster)[0]
+#        
+#        # Plot background points
+#        
+#        
+#        
+#        x = tsne.iloc[idx2, 0]
+#        y = tsne.iloc[idx2, 1]
+#        libplot.scatter(x, y, c=BACKGROUND_SAMPLE_COLOR, ax=ax)
+#        
+#        # Plot cluster over the top of the background
+#        
+#        x = tsne.iloc[idx1, 0]
+#        y = tsne.iloc[idx1, 1]
+#        
+#        if isinstance(colors, dict):
+#            color = colors[cluster]
+#        elif isinstance(colors, list):
+#            color = colors[i]
+#        else:
+#            color = 'black'
+#        
+#        libplot.scatter(x, y, c=color, ax=ax)
+#    
+#        if add_titles:
+#            if isinstance(cluster, int):
+#                prefix = 'C'
+#            else:
+#                prefix = ''
+#                
+#            ax.set_title('{}{} ({:,})'.format(prefix, cluster, len(idx1)), color=color)
+#                
+#        
+#        libplot.invisible_axes(ax)
+        
+        pc += 1
+            
+    return fig
+
+
+def create_cluster_grid(tsne,
+                        clusters,
+                        name,
+                        colors=None,
+                        cols=-1,
+                        size=SUBPLOT_SIZE,
+                        add_titles=True,
+                        cluster_order=None,
+                        type='tsne',
+                        dir='.'):
+    fig = cluster_grid(tsne, clusters, colors, cols=cols, size=size, add_titles=add_titles, cluster_order=cluster_order)
+    
+    libplot.savefig(fig, '{}/{}_{}_separate_clusters.png'.format(dir, type, name), pad=0)
+    #libplot.savefig(fig, '{}/tsne_{}_separate_clusters.pdf'.format(dir, name))
+    
+    
+    
+    
+def tsne_cluster_sample_grid(tsne, clusters, samples, colors=None, size=SUBPLOT_SIZE):
+    """
+    Plot each cluster separately to highlight samples
     
     Parameters
     ----------
@@ -803,9 +1098,9 @@ def tsne_cluster_grid(tsne, clusters, colors=None, size=SUBPLOT_SIZE):
     """
     
     
-    ids = list(sorted(set(clusters['Cluster'])))
+    cids = list(sorted(set(clusters['Cluster'])))
     
-    rows = int(np.ceil(np.sqrt(len(ids))))
+    rows = int(np.ceil(np.sqrt(len(cids))))
     
     w = size * rows
     
@@ -814,12 +1109,13 @@ def tsne_cluster_grid(tsne, clusters, colors=None, size=SUBPLOT_SIZE):
     if colors is None:
         colors = libcluster.colors()
     
-    for i in range(0, len(ids)):
-        c = ids[i]
+    for i in range(0, len(cids)):
+        c = cids[i]
         
         #print('Label {}'.format(l))
-        idx1 = np.where(clusters['Cluster'] == c)[0]
         idx2 = np.where(clusters['Cluster'] != c)[0]
+        
+        # Plot background points
         
         ax = libplot.new_ax(fig, subplot=(rows, rows, i + 1))
         
@@ -828,24 +1124,41 @@ def tsne_cluster_grid(tsne, clusters, colors=None, size=SUBPLOT_SIZE):
         
         libplot.scatter(x, y, c=BACKGROUND_SAMPLE_COLOR, ax=ax)
         
-        x = tsne.iloc[idx1, 0]
-        y = tsne.iloc[idx1, 1]
+        # Plot cluster over the top of the background
         
-        libplot.scatter(x, y, c=colors[i], ax=ax)
+        sid = 0
+        
+        for sample in samples:
+            id = '-{}'.format(sid + 1)
+            idx1 = np.where((clusters['Cluster'] == c) & clusters.index.str.contains(id))[0]
+        
+            x = tsne.iloc[idx1, 0]
+            y = tsne.iloc[idx1, 1]
+        
+            libplot.scatter(x, y, c=colors[sid], ax=ax)
+            
+            sid += 1
     
         ax.set_title('C{} ({:,})'.format(c, len(idx1)), color=colors[i])
         libplot.invisible_axes(ax)
         
-        set_tsne_ax_lim(tsne, ax)
+        #set_tsne_ax_lim(tsne, ax)
             
     return fig
 
 
-def create_tsne_cluster_grid(tsne, clusters, name, colors=None, size=SUBPLOT_SIZE, dir='.'):
-    fig = tsne_cluster_grid(tsne, clusters, colors, size)
+def create_tsne_cluster_sample_grid(tsne, clusters, samples, name, colors=None, size=SUBPLOT_SIZE, dir='.'):
+    """
+    Plot separate clusters colored by sample
+    """
+    fig = tsne_cluster_sample_grid(tsne, clusters, samples, colors, size)
     
-    libplot.savefig(fig, '{}/tsne_{}_separate_clusters.png'.format(dir, name))
-    libplot.savefig(fig, '{}/tsne_{}_separate_clusters.pdf'.format(dir, name))
+    libplot.savefig(fig, '{}/tsne_{}_sample_clusters.png'.format(dir, name))
+    #libplot.savefig(fig, '{}/tsne_{}_separate_clusters.pdf'.format(dir, name))
+    
+    
+    
+    
 
 
 
@@ -912,7 +1225,7 @@ def umi_norm_log2(data):
         return (d + 1).apply(np.log2)
 
 
-def scale(d):
+def scale(d, min=None, max=None):
     if isinstance(d, SparseDataFrame):
         print('UMI norm log2 scale sparse')
         sd = StandardScaler(with_mean=False).fit_transform(d.T.matrix)
@@ -920,8 +1233,18 @@ def scale(d):
         return SparseDataFrame(sd.T, index=d.index, columns=d.columns)
     else:
         sd = StandardScaler().fit_transform(d.T)
+        
+        sd = sd.T
+        
+        if isinstance(min, int):
+            print('z min', min)
+            sd[np.where(sd < min)] = min
+            
+        if isinstance(max, int):
+            print('z max', max)
+            sd[np.where(sd > max)] = max
     
-        return pd.DataFrame(sd.T, index=d.index, columns=d.columns)
+        return pd.DataFrame(sd, index=d.index, columns=d.columns)
 
 def umi_norm_log2_scale(data):
     d = umi_norm_log2(data)
@@ -1063,7 +1386,7 @@ def mkdir(path):
     except:
         pass
 
-def split_a_b(counts, w=6, h=6, format='pdf'):
+def split_a_b(counts, samples, w=6, h=6, format='pdf'):
     """ 
     Split cells into a and b
     """
@@ -1090,12 +1413,16 @@ def split_a_b(counts, w=6, h=6, format='pdf'):
     c_a = libtsne.load_phenograph_clusters(pca_a, 'a', cache=cache)
     
     create_pca_plot(pca_a, c_a, 'a', dir='a')
-    create_tsne_cluster_plot(tsne_a, c_a, 'a', dir='a')
-    create_tsne_cluster_grid(tsne_a, c_a, 'a', dir='a')
+    create_cluster_plot(tsne_a, c_a, 'a', dir='a')
+    create_cluster_grid(tsne_a, c_a, 'a', dir='a')
+    
+    create_merge_cluster_info(d_a, c_a, 'a', sample_names=samples, dir='a')
+    create_cluster_samples(tsne_a, c_a, samples, 'a_sample', dir='a')
+
     
     tsne_genes_expr(d_a, tsne_a, genes, prefix='a_BGY', cmap=BLUE_GREEN_YELLOW_CMAP, w=w, h=h, dir='a/GeneExp', format=format)
     
-    fig, ax = tsne_cluster_plot(tsne_a, c_a, legend=False, w=w, h=h)
+    fig, ax = cluster_plot(tsne_a, c_a, legend=False, w=w, h=h)
     libplot.savefig(fig, 'a/a_tsne_clusters_med.pdf')
     
     # b
@@ -1117,17 +1444,22 @@ def split_a_b(counts, w=6, h=6, format='pdf'):
     c_b = libtsne.load_phenograph_clusters(pca_b, 'b', cache=cache)
     
     create_pca_plot(pca_b, c_b, 'b', dir='b')
-    create_tsne_cluster_plot(tsne_b, c_b, 'b', dir='b')
-    create_tsne_cluster_grid(tsne_b, c_b, 'b', dir='b')
+    create_cluster_plot(tsne_b, c_b, 'b', dir='b')
+    create_cluster_grid(tsne_b, c_b, 'b', dir='b')
+    create_merge_cluster_info(d_b, c_b, 'b', sample_names=samples, dir='b')
+    create_cluster_samples(tsne_b, c_b, samples, 'b_sample', dir='b')
     
     tsne_genes_expr(d_b, tsne_b, genes, prefix='b_BGY', cmap=BLUE_GREEN_YELLOW_CMAP, w=w, h=h, dir='b/GeneExp', format=format)
     
-    fig, ax = tsne_cluster_plot(tsne_b, c_b, legend=False, w=w, h=h)
+    fig, ax = cluster_plot(tsne_b, c_b, legend=False, w=w, h=h)
     libplot.savefig(fig, 'b/b_tsne_clusters_med.pdf')
 
 
-
-def create_cluster_samples(tsne_umi_log2, clusters, sample_names, name, w=16, h=16):
+def sample_clusters(clusters, sample_names):
+    """
+    Create a cluster matrix based on samples rather than cells
+    """
+    
     sc = clusters.copy()
     
     c = 1
@@ -1137,4 +1469,11 @@ def create_cluster_samples(tsne_umi_log2, clusters, sample_names, name, w=16, h=
         sc[sc.index.str.contains(id)] = s
         c += 1
         
-    create_tsne_cluster_plot(tsne_umi_log2, sc, name, w=w, h=w)
+    return sc
+
+def create_cluster_samples(tsne_umi_log2, clusters, sample_names, name, dir='.', w=16, h=16):
+    sc = sample_clusters(clusters, sample_names)
+    
+    print(sc.tail())
+    
+    create_cluster_plot(tsne_umi_log2, sc, name, dir=dir, w=w, h=w)
