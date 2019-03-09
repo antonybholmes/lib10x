@@ -44,15 +44,13 @@ def create_sample_clusters(tsne, labels):
     
     return df
 
-def create_merge_cluster_info(counts, clusters, name, sample_names=('RK10001', 'RK10002'), dir='.'):
+def create_merge_cluster_info(clusters, name, sample_names=('RK10001', 'RK10002'), dir='.'):
     """
     Summarizes how many samples are in each cluster and from which experiment
     they came.
     
     Parameters
     ----------
-    counts : DataFrame
-        table of counts.
     clusters : DataFrame
         table of clusters.
     name : str
@@ -61,11 +59,11 @@ def create_merge_cluster_info(counts, clusters, name, sample_names=('RK10001', '
     
     cids = list(sorted(set(clusters['Cluster'].tolist())))
 
-    samples = np.array(['' for i in range(0, counts.columns.shape[0])], dtype=object)
+    samples = np.array(['' for i in range(0, clusters.shape[0])], dtype=object)
  
     for i in range(0, len(sample_names)):
         id = '-{}'.format(i + 1)
-        samples[counts.columns.str.contains(id)] = sample_names[i]
+        samples[clusters.index.str.contains(id)] = sample_names[i]
  
     size_map = {}
     cluster_sample_sizes = collections.defaultdict(lambda : collections.defaultdict(int))
@@ -77,13 +75,13 @@ def create_merge_cluster_info(counts, clusters, name, sample_names=('RK10001', '
             id = '-{}'.format(i + 1)
             
             # count how many cells are in each cluster for reach sample
-            cluster_sample_sizes[cid][sample_names[i]] = clusters[(clusters['Cluster'] == cid) & counts.columns.str.contains(id)].shape[0]
+            cluster_sample_sizes[cid][sample_names[i]] = clusters[(clusters['Cluster'] == cid) & clusters.index.str.contains(id)].shape[0]
             
 
-    sample_counts = np.zeros((counts.columns.shape[0], len(sample_names)), dtype=int)
-    sizes = np.zeros(counts.columns.shape[0], dtype=int)
+    sample_counts = np.zeros((clusters.shape[0], len(sample_names)), dtype=int)
+    sizes = np.zeros(clusters.shape[0], dtype=int)
 
-    for i in range(0, counts.columns.shape[0]):
+    for i in range(0, clusters.shape[0]):
         cs = cluster_sample_sizes[clusters['Cluster'][i]]
         
         for j in range(0, len(sample_names)):
@@ -93,7 +91,7 @@ def create_merge_cluster_info(counts, clusters, name, sample_names=('RK10001', '
         sizes[i] = size_map[clusters['Cluster'][i]]
         
        
-    df = pd.DataFrame({'Barcode':counts.columns, 'Cluster':clusters['Cluster'], 'Sample':samples, 'Size':sizes})
+    df = pd.DataFrame({'Barcode':clusters.index, 'Cluster':clusters['Cluster'], 'Sample':samples, 'Size':sizes})
     
     for i in range(0, len(sample_names)):
         df['Count {}'.format(sample_names[i])] = sample_counts[:, i]
