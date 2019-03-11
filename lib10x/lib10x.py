@@ -42,8 +42,6 @@ BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#000055'
                                                                        
 EXP_NORM = matplotlib.colors.Normalize(-1, 3, clip=True)
 
-NORM_3 = matplotlib.colors.Normalize(vmin=-3, vmax=3, clip=True)
-NORM_2_5 = matplotlib.colors.Normalize(vmin=-2.5, vmax=2.5, clip=True)
 
 CLUSTER_101_COLOR = (0.3, 0.3, 0.3)
 
@@ -327,7 +325,6 @@ def base_expr_plot(data,
                    exp, 
                    d1=1, 
                    d2=2, 
-                   t='TSNE', 
                    x1=None, 
                    x2=None, 
                    cmap=plt.cm.plasma, 
@@ -355,9 +352,6 @@ def base_expr_plot(data,
         First dimension being plotted (usually 1)
     d2 : int, optional
         Second dimension being plotted (usually 2)
-    t : str, optional
-        Indicate datatype, e.g. 'TSNE', or 'PCA'. This is for display purposes
-        and does not affect how the plot is created.
     fig : matplotlib figure, optional
         Supply a figure object on which to render the plot, otherwise a new
         one is created.
@@ -384,7 +378,7 @@ def base_expr_plot(data,
     #norm = matplotlib.colors.Normalize(vmin=-3, vmax=3, clip=True)
         
     if norm is None:
-        norm = NORM_3
+        norm = libplot.NORM_3
     
     # Sort by expression level so that extreme values always appear on top
     idx = np.argsort(abs(exp)) #np.argsort(exp)
@@ -415,8 +409,7 @@ def base_expr_plot(data,
 
 
 def expr_plot(data, 
-              exp, 
-              t='TSNE', 
+              exp,
               d1=1, 
               d2=2, 
               x1=None, 
@@ -446,7 +439,6 @@ def expr_plot(data,
                    exp, 
                    d1=d1, 
                    d2=d2, 
-                   t=t, 
                    s=s, 
                    marker=marker, 
                    alpha=alpha, 
@@ -520,7 +512,6 @@ def expr_plot(data,
 
 def create_expr_plot(tsne, 
                           exp, 
-                          name, 
                           d1=1, 
                           d2=2, 
                           x1=None, 
@@ -530,19 +521,41 @@ def create_expr_plot(tsne,
                           s=MARKER_SIZE, 
                           alpha=EXP_ALPHA, 
                           fig=None, 
-                          ax=None, 
-                          norm=None, 
+                          ax=None,
+                          w=libplot.DEFAULT_WIDTH,
+                          h=libplot.DEFAULT_HEIGHT,
+                          norm=None,
+                          method='tsne',
+                          colorbar=True,
                           out=None): #plt.cm.plasma):
     """
     Creates and saves a presentation tsne plot
     """
     
     if out is None:
-        out = 'tsne_expr_{}_t{}_vs_t{}.pdf'.format(name, 1, 2)
+        out = '{}_expr.pdf'.format(method)
     
-    fig, ax = expr_plot(tsne, exp, d1=d1, d2=d2, x1=x1, x2=x2, cmap=cmap, marker=marker, s=s, alpha=alpha, fig=fig, ax=ax, norm=norm, out=out)
+    fig, ax = expr_plot(tsne, 
+                        exp, 
+                        d1=d1, 
+                        d2=d2, 
+                        x1=x1, 
+                        x2=x2, 
+                        cmap=cmap, 
+                        marker=marker, 
+                        s=s, 
+                        alpha=alpha, 
+                        fig=fig,
+                        w=w,
+                        h=h,
+                        ax=ax,
+                        colorbar=colorbar,
+                        norm=norm)
 
-    libcluster.format_simple_axes(ax)
+    libplot.invisible_axes(ax) #libcluster.format_simple_axes(ax)
+    
+    if out is not None:
+        libplot.savefig(fig, out, pad=0)
     
     return fig, ax
 
@@ -748,12 +761,12 @@ def genes_expr(data,
                     prefix='',
                     index=None,
                     dir='GeneExp',
-                    cmap=BLUE_YELLOW_CMAP,
+                    cmap=BGY_CMAP,
                     norm=None,
                     w=libplot.DEFAULT_WIDTH,
                     h=libplot.DEFAULT_HEIGHT,
                     colorbar=True,
-                    type='tsne',
+                    method='tsne',
                     format='pdf'):
     """
     Plot multiple genes on a grid.
@@ -806,11 +819,11 @@ def genes_expr(data,
         #libplot.add_colorbar(fig, cmap)
         
         if gene_id != gene:
-            out = '{}/{}_expr_{}_{}.{}'.format(dir, type, gene, gene_id, format)
+            out = '{}/{}_expr_{}_{}.{}'.format(dir, method, gene, gene_id, format)
         else:
-            out = '{}/{}_expr_{}.{}'.format(dir, type, gene, format)
+            out = '{}/{}_expr_{}.{}'.format(dir, method, gene, format)
 
-        fig, ax = expr_plot(tsne, exp, cmap=cmap, out=out, w=w, h=h, colorbar=colorbar, norm=norm)
+        fig, ax = create_expr_plot(tsne, exp, cmap=cmap, out=out, w=w, h=h, colorbar=colorbar, norm=norm)
         plt.close(fig)
         
 
