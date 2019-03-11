@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='lib10x',
-    version='0.5.0',
+    version='0.6.0',
     author='Antony B Holmes',
     author_email='antony.b.holmes@gmail.com',
     description='A library for analyzing 10X Genomics data.',
