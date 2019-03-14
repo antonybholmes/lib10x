@@ -282,7 +282,7 @@ def cluster_plot(tsne, clusters, markers='o', s=libplot.MARKER_SIZE, colors=None
 def create_cluster_plot(tsne_results, 
                         clusters, 
                         name,
-                        type='tsne',
+                        method='tsne',
                         markers='o', 
                         s=libplot.MARKER_SIZE, 
                         w=8, 
@@ -291,7 +291,7 @@ def create_cluster_plot(tsne_results,
                         ax=None,
                         format='pdf',
                         dir='.'):
-    out = '{}/{}_{}.{}'.format(dir, type, name, format) #libtsne.get_tsne_plot_name(name))
+    out = '{}/{}_{}.{}'.format(dir, method, name, format) #libtsne.get_tsne_plot_name(name))
     
     print(out)
     
@@ -1493,9 +1493,7 @@ def sample_clusters(clusters, sample_names):
         
     return sc
 
-def create_cluster_samples(tsne_umi_log2, clusters, sample_names, name, dir='.', w=16, h=16):
+def create_cluster_samples(tsne_umi_log2, clusters, sample_names, name, method='tsne', dir='.', w=16, h=16):
     sc = sample_clusters(clusters, sample_names)
     
-    print(sc.tail())
-    
-    create_cluster_plot(tsne_umi_log2, sc, name, dir=dir, w=w, h=w)
+    create_cluster_plot(tsne_umi_log2, sc, name, method=method, dir=dir, w=w, h=w)
