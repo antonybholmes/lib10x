@@ -1,4 +1,4 @@
-./update.sh
+./commit.sh
 
 rm dist/*
 python setup.py sdist
