@@ -37,20 +37,17 @@ from scipy.stats import binned_statistic
 
 def cluster_outlines(d,
                      clusters,
-                     sdmax=10,
                      ax=None):
     for cluster in clusters['Cluster'].unique():
         cluster_outline(d,
                         cluster,
                         clusters,
-                        sdmax=sdmax,
                         ax=ax)
 
 
 def cluster_outline(d,
                     cluster,
                     clusters,
-                    sdmax=10,
                     ax=None):
     """
     Draw outline around cluster, attempt to use bulk
@@ -60,7 +57,6 @@ def cluster_outline(d,
         tsne (_type_): _description_
         cluster (_type_): _description_
         clusters (_type_): _description_
-        sdmax (float, optional): _description_. Defaults to 0.5.
         ax (_type_, optional): _description_. Defaults to None.
     """
     barcodes = clusters[clusters['Cluster'] == cluster].index.values
@@ -99,7 +95,7 @@ def cluster_outline(d,
 
     # find all points within 1 sd of centroid
 
-    idx = np.where(abs(z) < sdmax)[0]  # (d > x1) & (d < x2))[0]
+    #idx = np.where(abs(z) < sdmax)[0]  # (d > x1) & (d < x2))[0]
     #x = x[idx]
     #y = y[idx]
 
