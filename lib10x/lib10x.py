@@ -38,63 +38,12 @@ from PIL import Image, ImageFilter
 
 from scipy.stats import binned_statistic
 
+from .outline import cluster_outline
+
 import imagelib
 
-TNSE_AX_Q = 0.999
+from .constants import *
 
-MARKER_SIZE = 10
-
-SUBPLOT_SIZE = 4
-EXP_ALPHA = 0.8
-# '#f2f2f2' #(0.98, 0.98, 0.98) #(0.8, 0.8, 0.8) #(0.85, 0.85, 0.85
-BACKGROUND_SAMPLE_COLOR = [0.75, 0.75, 0.75]
-EDGE_COLOR = None  # [0.3, 0.3, 0.3] #'#4d4d4d'
-EDGE_WIDTH = 0  # 0.25
-ALPHA = 0.9
-
-BLUE_YELLOW_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
-    'blue_yellow', ['#162d50', '#ffdd55'])
-BLUE_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
-    'blue', ['#162d50', '#afc6e9'])
-BLUE_GREEN_YELLOW_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
-    'bgy', ['#162d50', '#214478', '#217844', '#ffcc00', '#ffdd55'])
-
-# BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#002255', '#2ca05a', '#ffd42a'])
-# BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#002255', '#003380', '#2ca05a', '#ffd42a', '#ffdd55'])
-
-# BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#003366', '#339966', '#ffff66', '#ffff00')
-# BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#001a33', '#003366', '#339933', '#ffff66', '#ffff00'])
-# BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#00264d', '#003366', '#339933', '#e6e600', '#ffff33'])
-# BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#003366', '#40bf80', '#ffff33'])
-
-BGY_ORIG_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
-    'bgy', ['#002255', '#003380', '#2ca05a', '#ffd42a', '#ffdd55'])
-
-BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
-    'bgy', ['#003366', '#004d99', '#40bf80', '#ffe066', '#ffd633'])
-
-GRAY_PURPLE_YELLOW_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
-    'grey_purple_yellow', ['#e6e6e6', '#3333ff', '#ff33ff', '#ffe066'])
-
-GYBLGRYL_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
-    'grey_blue_green_yellow', ['#e6e6e6', '#0055d4', '#00aa44', '#ffe066'])
-
-OR_RED_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
-    'or_red', matplotlib.cm.OrRd(range(4, 256)))
-
-BU_PU_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list(
-    'bu_pu', matplotlib.cm.BuPu(range(4, 256)))
-
-
-# BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#0066ff', '#37c871', '#ffd42a'])
-# BGY_CMAP = matplotlib.colors.LinearSegmentedColormap.from_list('bgy', ['#003380', '#5fd38d', '#ffd42a'])
-
-EXP_NORM = matplotlib.colors.Normalize(-1, 3, clip=True)
-
-LEGEND_PARAMS = {'show': True, 'cols': 4, 'markerscale': 2}
-
-
-CLUSTER_101_COLOR = (0.3, 0.3, 0.3)
 
 np.random.seed(0)
 
@@ -453,6 +402,11 @@ def base_cluster_plot(d,
                                 cluster_order=cluster_order,
                                 sort=sort)
 
+    cluster_outlines(d,
+             clusters,
+             sdmax=10,
+             ax=ax)
+
     #set_tsne_ax_lim(tsne, ax)
 
     # libcluster.format_axes(ax)
@@ -721,371 +675,7 @@ def tsne_plot(tsne, marker='o', s=libplot.MARKER_SIZE, c='red', label=None, fig=
     return fig, ax
 
 
-def base_expr_plot(data,
-                   exp,
-                   dim=[1, 2],
-                   cmap=plt.cm.plasma,
-                   marker='o',
-                   edgecolors=EDGE_COLOR,
-                   linewidth=1,
-                   s=MARKER_SIZE,
-                   alpha=1,
-                   w=libplot.DEFAULT_WIDTH,
-                   h=libplot.DEFAULT_HEIGHT,
-                   fig=None,
-                   ax=None,
-                   norm=None):  # plt.cm.plasma):
-    """
-    Base function for creating an expression plot for T-SNE/2D space
-    reduced representation of data.
 
-    Parameters
-    ----------
-    data : Pandas dataframe
-        features x dimensions, e.g. rows are cells and columns are tsne dimensions
-    exp : numpy array
-        expression values for each data point so it must have the same number
-        of elements as data has rows.
-    d1 : int, optional
-        First dimension being plotted (usually 1)
-    d2 : int, optional
-        Second dimension being plotted (usually 2)
-    fig : matplotlib figure, optional
-        Supply a figure object on which to render the plot, otherwise a new
-        one is created.
-    ax : matplotlib ax, optional
-        Supply an axis object on which to render the plot, otherwise a new
-        one is created.
-    norm : Normalize, optional
-        Specify how colors should be normalized
-
-    Returns
-    -------
-    fig : matplotlib figure
-        If fig is a supplied argument, return the supplied figure, otherwise
-        a new figure is created and returned.
-    ax : matplotlib axis
-        If ax is a supplied argument, return this, otherwise create a new
-        axis and attach to figure before returning.
-    """
-
-    if ax is None:
-        fig, ax = libplot.new_fig(w=w, h=h)
-
-    # if norm is None and exp.min() < 0:
-    #norm = matplotlib.colors.Normalize(vmin=-3, vmax=3, clip=True)
-
-    if norm is None:
-        norm = libplot.NORM_3
-
-    # Sort by expression level so that extreme values always appear on top
-    idx = np.argsort(exp) #np.argsort(abs(exp))  # np.argsort(exp)
-
-    x = data.iloc[idx, dim[0] - 1].values  # data['{}-{}'.format(t, d1)][idx]
-    y = data.iloc[idx, dim[1] - 1].values  # data['{}-{}'.format(t, d2)][idx]
-    e = exp[idx]
-
-    # if (e.min() == 0):
-    #print('Data does not appear to be z-scored. Transforming now...')
-    # zscore
-    #e = (e - e.mean()) / e.std()
-
-    #print(e.min(), e.max())
-
-    # z-score
-    #e = (e - e.mean()) / e.std()
-
-    # limit to 3 std for z-scores
-    #e[e < -3] = -3
-    #e[e > 3] = 3
-
-    ax.scatter(x,
-               y,
-               c=e,
-               s=s,
-               marker=marker,
-               alpha=alpha,
-               cmap=cmap,
-               norm=norm,
-               edgecolors='none',  # edgecolors,
-               linewidth=linewidth)
-
-#    for i in range(0, x.size):
-#        en = norm(e[i])
-#        color = cmap(int(en * cmap.N))
-#        color = np.array(color)
-#
-#        c1 = color.copy()
-#        c1[-1] = 0.5
-#
-#        #print(c1)
-#
-#        ax.scatter(x[i],
-#               y[i],
-#               c=[c1],
-#               s=s,
-#               marker=marker,
-#               edgecolors='none', #edgecolors,
-#               linewidth=linewidth)
-#
-#
-#
-#        mean = color.mean()
-#
-#        #print(x[i], y[i], mean)
-#
-#        #if mean > 0.5:
-#        ax.scatter(x[i],
-#               y[i],
-#               c='#ffffff00',
-#               s=s,
-#               marker=marker,
-#               norm=norm,
-#               edgecolors=[color],
-#               linewidth=linewidth)
-
-    #libcluster.format_axes(ax, title=t)
-
-    return fig, ax
-
-
-def expr_plot(data,
-              exp,
-              dim=[1, 2],
-              cmap=plt.cm.magma,
-              marker='o',
-              s=MARKER_SIZE,
-              alpha=1,
-              edgecolors=EDGE_COLOR,
-              linewidth=EDGE_WIDTH,
-              w=libplot.DEFAULT_WIDTH,
-              h=libplot.DEFAULT_HEIGHT,
-              show_axes=False,
-              fig=None,
-              ax=None,
-              norm=None,
-              colorbar=False):  # plt.cm.plasma):
-    """
-    Creates a base expression plot and adds a color bar.
-    """
-
-    is_first = False
-
-    if ax is None:
-        fig, ax = libplot.new_fig(w, h)
-        is_first = True
-
-    base_expr_plot(data,
-                   exp,
-                   dim=dim,
-                   s=s,
-                   marker=marker,
-                   edgecolors=edgecolors,
-                   linewidth=linewidth,
-                   alpha=alpha,
-                   cmap=cmap,
-                   norm=norm,
-                   w=w,
-                   h=h,
-                   ax=ax)
-
-    # if colorbar or is_first:
-    if colorbar:
-        libplot.add_colorbar(fig, cmap, norm=norm)
-        #libcluster.format_simple_axes(ax, title=t)
-
-    if not show_axes:
-        libplot.invisible_axes(ax)
-
-    return fig, ax
-
-
-# def expr_plot(tsne,
-#                   exp,
-#                   d1=1,
-#                   d2=2,
-#                   x1=None,
-#                   x2=None,
-#                   cmap=BLUE_YELLOW_CMAP,
-#                   marker='o',
-#                   s=MARKER_SIZE,
-#                   alpha=EXP_ALPHA,
-#                   out=None,
-#                   fig=None,
-#                   ax=None,
-#                   norm=None,
-#                   w=libplot.DEFAULT_WIDTH,
-#                   h=libplot.DEFAULT_HEIGHT,
-#                   colorbar=True): #plt.cm.plasma):
-#    """
-#    Creates a basic t-sne expression plot.
-#
-#    Parameters
-#    ----------
-#    data : pandas.DataFrame
-#        t-sne 2D data
-#    """
-#
-#    fig, ax = expr_plot(tsne,
-#                        exp,
-#                        t='TSNE',
-#                        d1=d1,
-#                        d2=d2,
-#                        x1=x1,
-#                        x2=x2,
-#                        cmap=cmap,
-#                        marker=marker,
-#                        s=s,
-#                        alpha=alpha,
-#                        fig=fig,
-#                        ax=ax,
-#                        norm=norm,
-#                        w=w,
-#                        h=h,
-#                        colorbar=colorbar)
-#
-#    set_tsne_ax_lim(tsne, ax)
-#
-#    libplot.invisible_axes(ax)
-#
-#    if out is not None:
-#        libplot.savefig(fig, out, pad=0)
-#
-#    return fig, ax
-
-
-def create_expr_plot(tsne,
-                     exp,
-                     dim=[1, 2],
-                     cmap=None,
-                     marker='o',
-                     s=MARKER_SIZE,
-                     alpha=EXP_ALPHA,
-                     fig=None,
-                     ax=None,
-                     w=libplot.DEFAULT_WIDTH,
-                     h=libplot.DEFAULT_HEIGHT,
-                     edgecolors=EDGE_COLOR,
-                     linewidth=EDGE_WIDTH,
-                     norm=None,
-                     method='tsne',
-                     show_axes=False,
-                     colorbar=True,
-                     out=None):  # plt.cm.plasma):
-    """
-    Creates and saves a presentation tsne plot
-    """
-
-    if out is None:
-        out = '{}_expr.pdf'.format(method)
-
-    fig, ax = expr_plot(tsne,
-                        exp,
-                        dim=dim,
-                        cmap=cmap,
-                        marker=marker,
-                        s=s,
-                        alpha=alpha,
-                        fig=fig,
-                        w=w,
-                        h=h,
-                        ax=ax,
-                        show_axes=show_axes,
-                        colorbar=colorbar,
-                        norm=norm,
-                        linewidth=linewidth,
-                        edgecolors=edgecolors)
-
-    if out is not None:
-        libplot.savefig(fig, out, pad=0)
-
-    return fig, ax
-
-
-def base_pca_expr_plot(data,
-                       exp,
-                       dim=[1, 2],
-                       cmap=None,
-                       marker='o',
-                       s=MARKER_SIZE,
-                       alpha=EXP_ALPHA,
-                       fig=None,
-                       ax=None,
-                       norm=None):  # plt.cm.plasma):
-    fig, ax = base_expr_plot(data,
-                             exp,
-                             t='PC',
-                             dim=dim,
-                             cmap=cmap,
-                             marker=marker,
-                             s=s,
-                             fig=fig,
-                             alpha=alpha,
-                             ax=ax,
-                             norm=norm)
-
-    return fig, ax
-
-
-def pca_expr_plot(data,
-                  expr,
-                  name,
-                  dim=[1, 2],
-                  cmap=None,
-                  marker='o',
-                  s=MARKER_SIZE,
-                  alpha=EXP_ALPHA,
-                  fig=None,
-                  ax=None,
-                  norm=None):  # plt.cm.plasma):
-    out = 'pca_expr_{}_t{}_vs_t{}.pdf'.format(name, 1, 2)
-
-    fig, ax = base_pca_expr_plot(data,
-                                 expr,
-                                 dim=dim,
-                                 cmap=cmap,
-                                 marker=marker,
-                                 s=s,
-                                 alpha=alpha,
-                                 fig=fig,
-                                 ax=ax,
-                                 norm=norm)
-
-    libplot.savefig(fig, out)
-    plt.close(fig)
-
-    return fig, ax
-
-
-def expr_grid_size(x, size=SUBPLOT_SIZE):
-    """
-    Auto size grid to look nice.
-    """
-
-    if type(x) is int:
-        l = x
-    elif type(x) is list:
-        l = len(x)
-    elif type(x) is np.ndarray:
-        l = x.shape[0]
-    elif type(x) is pd.core.frame.DataFrame:
-        l = x.shape[0]
-    else:
-        return None
-
-    cols = int(np.ceil(np.sqrt(l)))
-
-    w = size * cols
-
-    rows = int(l / cols) + 2
-
-    if l % cols == 0:
-        # Assume we will add a row for a color bar
-        rows += 1
-
-    h = size * rows
-
-    return w, h, rows, cols
 
 
 def get_gene_names(data):
@@ -1695,12 +1285,14 @@ def gene_expr(data, tsne, gene, fig=None, ax=None, cmap=plt.cm.plasma, out=None)
     return expr_plot(tsne, exp, fig=fig, ax=ax, cmap=cmap, out=out)
 
 
+
+
+
 def separate_cluster(tsne,
                      clusters,
                      cluster,
                      color='black',
                      background=BACKGROUND_SAMPLE_COLOR,
-                     bgedgecolor='#808080',
                      show_background=True,
                      add_titles=True,
                      size=4,
@@ -1772,6 +1364,12 @@ def separate_cluster(tsne,
                     edgecolors='none',  # edgecolors,
                     linewidth=linewidth,
                     s=s)
+
+    cluster_outline(tsne,
+             cluster,
+             clusters,
+             sdmax=0.5,
+             ax=ax)
 
     if add_titles:
         if isinstance(cluster, int):
@@ -1893,8 +1491,6 @@ def cluster_grid(tsne,
         cluster = ids[i]
         # look up index for color purposes
         #i = np.where(ids == cluster)[0][0]
-
-        print('index', i, cluster, colors)
 
         if isinstance(colors, dict):
             color = colors.get(cluster, 'black')
@@ -2284,12 +1880,11 @@ def centroid_network(tsne, clusters, name):
 
 
 def centroids(tsne, clusters):
-    cids = list(sorted(set(clusters['Cluster'].tolist())))
+    cids = list(sorted(set(clusters['Cluster'].values)))
 
     ret = np.zeros((len(cids), 2))
 
-    for i in range(0, len(cids)):
-        c = cids[i]
+    for i, c in enumerate(cids):
         x = tsne.iloc[np.where(clusters['Cluster'] == c)[0], :]
         centroid = (x.sum(axis=0) / x.shape[0]).tolist()
         ret[i, 0] = centroid[0]
@@ -2409,26 +2004,27 @@ def split_a_b(counts, samples, w=6, h=6, format='pdf'):
     libplot.savefig(fig, 'b/b_tsne_clusters_med.pdf')
 
 
-def sample_clusters(d, sample_names):
+def sample_clusters(clusters, sample_names, sep='-'):
     """
     Create a cluster matrix based on by labelling cells by sample/batch.
     """
 
-    sc = np.array(['' for i in range(0, d.shape[0])], dtype=object)
+    sc = np.array([''] * clusters.shape[0], dtype=object)
 
-    c = 1
+    if isinstance(sample_names, dict):
+        for sample, id in sample_names.items():
+            sc[np.where(clusters.index.str.contains(id))[0]] = sample
+    else:
+        c = 1
 
-    for s in sample_names:
-        id = '-{}'.format(c)
-        print(id)
-        print(np.where(d.index.str.contains(id))[0])
-        sc[np.where(d.index.str.contains(id))[0]] = s
-        c += 1
+        for s in sample_names:
+            id = f'{sep}{c}'
+            print(id)
+            print(np.where(clusters.index.str.contains(id))[0])
+            sc[np.where(clusters.index.str.contains(id))[0]] = s
+            c += 1
 
-    print(np.unique(d.index.values))
-    print(np.unique(sc))
-
-    df = pd.DataFrame(sc, index=d.index, columns=['Cluster'])
+    df = pd.DataFrame(sc, index=clusters.index, columns=['Cluster'])
 
     return df
 

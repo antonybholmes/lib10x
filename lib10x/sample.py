@@ -60,14 +60,15 @@ def create_merge_cluster_info(clusters, name, sample_names=('RK10001', 'RK10002'
     
     cids = list(sorted(set(clusters['Cluster'].tolist())))
 
-    samples = np.array(['' for i in range(0, clusters.shape[0])], dtype=object)
-  
-    for i in range(0, len(sample_names)):
-        id = '-{}'.format(i + 1)
-        
-        samples[clusters.index.str.contains(id)] = sample_names[i]
-        id = '.{}'.format(i + 1)
-        samples[clusters.index.str.contains(id)] = sample_names[i]
+    samples = np.array([''] * clusters.shape[0], dtype=object)
+    
+    if isinstance(sample_names, dict):
+        for sample, id in sample_names.items():
+            samples[clusters.index.str.contains(id)] = sample
+    else:
+        for i in range(0, len(sample_names)):
+            id = '.{}'.format(i + 1)
+            samples[clusters.index.str.contains(id)] = sample_names[i]
  
     size_map = {}
     cluster_sample_sizes = collections.defaultdict(lambda : collections.defaultdict(int))
@@ -75,12 +76,15 @@ def create_merge_cluster_info(clusters, name, sample_names=('RK10001', 'RK10002'
     for cid in cids:
         size_map[cid] = clusters[clusters['Cluster'] == cid]['Cluster'].shape[0]
         
-        for i in range(0, len(sample_names)):
-            id = '-{}'.format(i + 1)
-            # count how many cells are in each cluster for each sample
-            cluster_sample_sizes[cid][sample_names[i]] = clusters[(clusters['Cluster'] == cid) & clusters.index.str.contains(id)].shape[0]
-            id = '.{}'.format(i + 1)
-            cluster_sample_sizes[cid][sample_names[i]] = clusters[(clusters['Cluster'] == cid) & clusters.index.str.contains(id)].shape[0]
+        if isinstance(sample_names, dict):
+            for sample, id in sample_names.items():
+                cluster_sample_sizes[cid][sample] = clusters[(clusters['Cluster'] == cid) & clusters.index.str.contains(id)].shape[0]
+        else:
+            for i in range(0, len(sample_names)):
+                id = '-{}'.format(i + 1)
+                # count how many cells are in each cluster for each sample
+                cluster_sample_sizes[cid][sample_names[i]] = clusters[(clusters['Cluster'] == cid) & clusters.index.str.contains(id)].shape[0]
+
             
 
     sample_counts = np.zeros((clusters.shape[0], len(sample_names)), dtype=int)
@@ -89,8 +93,12 @@ def create_merge_cluster_info(clusters, name, sample_names=('RK10001', 'RK10002'
     for i in range(0, clusters.shape[0]):
         cs = cluster_sample_sizes[clusters['Cluster'][i]]
         
-        for j in range(0, len(sample_names)):
-            sample_counts[i, j] = cs[sample_names[j]]
+        if isinstance(sample_names, dict):
+            for j, sample in enumerate(sorted(sample_names)):
+                sample_counts[i, j] = cs[sample]
+        else:
+            for j in range(0, len(sample_names)):
+                sample_counts[i, j] = cs[sample_names[j]]
         
         
         sizes[i] = size_map[clusters['Cluster'][i]]
@@ -98,8 +106,12 @@ def create_merge_cluster_info(clusters, name, sample_names=('RK10001', 'RK10002'
        
     df = pd.DataFrame({'Barcode':clusters.index, 'Cluster':clusters['Cluster'], 'Sample':samples, 'Size':sizes})
     
-    for i in range(0, len(sample_names)):
-        df['Count {}'.format(sample_names[i])] = sample_counts[:, i]
+    if isinstance(sample_names, dict):
+        for i, sample in enumerate(sorted(sample_names)):
+            df['Count {}'.format(sample)] = sample_counts[:, i]
+    else:
+        for i in range(0, len(sample_names)):
+            df['Count {}'.format(sample_names[i])] = sample_counts[:, i]
     
     #df = df[['Barcode', 'Cluster', 'Sample', '{} count'.format(sample_names[0]), '{} count'.format(sample_names[1]), 'Size']]
     df.to_csv('{}/{}_cell_cluster_info.txt'.format(dir, name), sep='\t', header=True, index=False)
@@ -114,16 +126,24 @@ def create_merge_cluster_info(clusters, name, sample_names=('RK10001', 'RK10002'
         
         cs = cluster_sample_sizes[c]
         
-        for j in range(0, len(sample_names)):
-            sample_counts[i, j] = cs[sample_names[j]]
+        if isinstance(sample_names, dict):
+            for j, sample in enumerate(sorted(sample_names)):
+                sample_counts[i, j] = cs[sample]
+        else:
+            for j in range(0, len(sample_names)):
+                sample_counts[i, j] = cs[sample_names[j]]
         
         sizes[i] = size_map[c]
     
     df = pd.DataFrame({'Cluster':cids, 'Size':sizes})
     
-    for i in range(0, len(sample_names)):
-        df['Count {}'.format(sample_names[i])] = sample_counts[:, i]
-    
+    if isinstance(sample_names, dict):
+        for i, sample in enumerate(sorted(sample_names)):
+            df['Count {}'.format(sample)] = sample_counts[:, i]
+    else:
+        for i in range(0, len(sample_names)):
+            df['Count {}'.format(sample_names[i])] = sample_counts[:, i]
+        
     #df = df[['Barcode', 'Cluster', 'Sample', '{} count'.format(sample_names[0]), '{} count'.format(sample_names[1]), 'Size']]
     df.to_csv('{}/{}_cluster_info.txt'.format(dir, name), sep='\t', header=True, index=False)
     
