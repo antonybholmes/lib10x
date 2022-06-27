@@ -64,7 +64,11 @@ def create_merge_cluster_info(clusters, name, sample_names=('RK10001', 'RK10002'
     
     if isinstance(sample_names, dict):
         for sample, id in sample_names.items():
-            samples[clusters.index.str.contains(id)] = sample
+            if isinstance(id, list):
+                for x in id:
+                    samples[clusters.index.str.contains(x)] = sample
+            else:
+                samples[clusters.index.str.contains(id)] = sample
     else:
         for i in range(0, len(sample_names)):
             id = '.{}'.format(i + 1)
@@ -78,7 +82,10 @@ def create_merge_cluster_info(clusters, name, sample_names=('RK10001', 'RK10002'
         
         if isinstance(sample_names, dict):
             for sample, id in sample_names.items():
-                cluster_sample_sizes[cid][sample] = clusters[(clusters['Cluster'] == cid) & clusters.index.str.contains(id)].shape[0]
+                if isinstance(id, list):
+                    cluster_sample_sizes[cid][sample] = np.sum([clusters[(clusters['Cluster'] == cid) & clusters.index.str.contains(x)].shape[0] for x in id])
+                else:
+                    cluster_sample_sizes[cid][sample] = clusters[(clusters['Cluster'] == cid) & clusters.index.str.contains(id)].shape[0]
         else:
             for i in range(0, len(sample_names)):
                 id = '-{}'.format(i + 1)

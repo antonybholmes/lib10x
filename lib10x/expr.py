@@ -12,7 +12,6 @@ import networkx as nx
 import os
 import phenograph
 import libplot
-import libcluster
 import libtsne
 import seaborn as sns
 from .constants import *
@@ -145,7 +144,7 @@ def base_expr_plot(data,
 #               edgecolors=[color],
 #               linewidth=linewidth)
 
-    #libcluster.format_axes(ax, title=t)
+    #format_axes(ax, title=t)
 
     return fig, ax
 
@@ -193,7 +192,7 @@ def expr_plot(data,
     # if colorbar or is_first:
     if colorbar:
         libplot.add_colorbar(fig, cmap, norm=norm)
-        #libcluster.format_simple_axes(ax, title=t)
+        #format_simple_axes(ax, title=t)
 
     if not show_axes:
         libplot.invisible_axes(ax)
@@ -433,7 +432,7 @@ def gene_expr_grid(data, tsne, genes, cmap=None, size=SUBPLOT_SIZE):
         expr_plot(tsne, exp, ax=ax, cmap=cmap, colorbar=False)
 
         # if i == 0:
-        #    libcluster.format_axes(ax)
+        #    format_axes(ax)
         # else:
 
         # libplot.invisible_axes(ax)

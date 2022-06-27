@@ -3,4 +3,5 @@ from .sample import *
 from .cluster import *
 from .expr import *
 from .outline import *
-from .constants  import *
+from .constants import *
+from .color import *

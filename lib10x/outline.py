@@ -22,7 +22,6 @@ import networkx as nx
 import os
 import phenograph
 import libplot
-import libcluster
 import libtsne
 import seaborn as sns
 from libsparse.libsparse import SparseDataFrame
@@ -31,23 +30,30 @@ from scipy.spatial import ConvexHull
 from PIL import Image, ImageFilter
 
 from scipy.stats import binned_statistic
-
+from . import color
 
 
 
 def cluster_outlines(d,
                      clusters,
+                     colors=['black'],
                      ax=None):
-    for cluster in clusters['Cluster'].unique():
+
+    if colors == None:
+        colors = color.get_colors()
+
+    for i, cluster in enumerate(sorted(clusters['Cluster'].unique())):
         cluster_outline(d,
                         cluster,
                         clusters,
+                        color=colors[i % len(colors)],
                         ax=ax)
 
 
 def cluster_outline(d,
                     cluster,
                     clusters,
+                    color='black',
                     ax=None):
     """
     Draw outline around cluster, attempt to use bulk
@@ -76,7 +82,7 @@ def cluster_outline(d,
     q2 = np.percentile(da, 75)
     iqr = q2 - q1
 
-    outlier = q2 + iqr
+    outlier = q2 + iqr * 1.5
     idx = np.where(da < outlier)[0]  # (d > x1) & (d < x2))[0]
     x = x[idx]
     y = y[idx]
@@ -89,9 +95,6 @@ def cluster_outline(d,
     za = abs(z)
 
     iza = 1 / za ** 2
-
-    if (cluster == 8 or cluster == 2):
-        print('sdsdf', cluster, za.max(), np.median(za))
 
     # find all points within 1 sd of centroid
 
@@ -108,8 +111,8 @@ def cluster_outline(d,
     xp = np.append(xp, xp[0])
     yp = np.append(yp, yp[0])
 
-    ax.plot(xp, yp, 'k-')
-    cc = plt.Circle((centroid[0], centroid[1]), 0.2)
+    ax.plot(xp, yp, '-', color=color)
+    cc = plt.Circle((centroid[0], centroid[1]), 0.1, facecolor=color, edgecolor='black', linewidth=1, linestyle='-')
     ax.add_artist(cc)
     #ax.plot(points[hull.vertices[0], 0], points[hull.vertices[[0, -1]], 1])
 
