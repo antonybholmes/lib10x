@@ -15,8 +15,48 @@ import libplot
 import libtsne
 import seaborn as sns
 from .constants import *
+from .lib10x import get_gene_names, get_gene_ids, mkdir
+from .color import *
+from libsparse import SparseDataFrame
+from PIL import Image, ImageFilter
 
 EXPR_ALPHA = 0.8
+
+def get_gene_data(data, g, ids=None, gene_names=None):
+    if ids is None:
+        ids, gene_names = get_gene_names(data)
+
+    if isinstance(g, list):
+        g = np.array(g)
+
+    if isinstance(g, np.ndarray):
+        idx = np.where(np.isin(ids, g))[0]
+
+        if idx.size < 1:
+            # if id does not exist, try the gene names
+            idx = np.where(np.isin(gene_names, g))[0]
+
+            if idx.size < 1:
+                return None
+    else:
+        idx = np.where(ids == g)[0]
+
+        if idx.size > 0:
+            # if id exists, pick the first
+            idx = idx[0]
+        else:
+            # if id does not exist, try the gene names
+            idx = np.where(gene_names == g)[0]
+
+            if idx.size > 0:
+                idx = idx[0]
+            else:
+                return None
+
+    if isinstance(data, SparseDataFrame):
+        return data[idx, :].to_array()
+    else:
+        return data.iloc[idx, :].values
 
 
 def base_expr_plot(data,
@@ -77,9 +117,9 @@ def base_expr_plot(data,
         norm = libplot.NORM_3
 
     # Sort by expression level so that extreme values always appear on top
-    idx = np.argsort(exp)  # np.argsort(abs(exp))  # np.argsort(exp)
+    idx = np.argsort(exp)   # np.argsort(abs(exp))  # np.argsort(exp)
 
-    print(data.shape, idx)
+    print(data.shape, idx, dim)
 
     x = data.iloc[idx, dim[0] - 1].values  # data['{}-{}'.format(t, d1)][idx]
     y = data.iloc[idx, dim[1] - 1].values  # data['{}-{}'.format(t, d2)][idx]
@@ -460,6 +500,7 @@ def genes_expr(data,
                linewidth=EDGE_WIDTH,
                edgecolors='none',
                colorbar=True,
+               outline=True,
                method='tsne',
                format='png'):
     """
@@ -533,36 +574,40 @@ def genes_expr(data,
         else:
             out = '{}/{}_expr_{}.{}'.format(dir, method, gene, format)
 
-        libplot.savefig(fig, 'tmp.png', pad=0)
         libplot.savefig(fig, out, pad=0)
+
+        if outline:
+            libplot.savefig(fig, 'tmp.png', pad=0)
+            
+            
+
+            im1 = Image.open('tmp.png')
+
+            # Edge detect on what is left (the clusters)
+            imageWithEdges = im1.filter(ImageFilter.FIND_EDGES)
+            im_data = np.array(imageWithEdges.convert('RGBA'))
+
+            #r = data[:, :, 0]
+            #g = data[:, :, 1]
+            #b = data[:, :, 2]
+            a = im_data[:, :, 3]
+
+            # (r < 255) | (g < 255) | (b < 255) #(r > 0) & (r == g) & (r == b) & (g == b)
+            black_areas = (a > 0)
+
+            d = im_data[np.where(black_areas)]
+            d[:, 0:3] = [64, 64, 64]
+            im_data[np.where(black_areas)] = d
+
+            im2 = Image.fromarray(im_data)
+            im2.save('edges.png', 'png')
+
+            # overlay edges on top of original image to highlight cluster
+            # enable if edges desired
+            im1.paste(im2, (0, 0), im2)
+            im1.save(out, 'png')
+    
         plt.close(fig)
-
-        im1 = Image.open('tmp.png')
-
-        # Edge detect on what is left (the clusters)
-        imageWithEdges = im1.filter(ImageFilter.FIND_EDGES)
-        im_data = np.array(imageWithEdges.convert('RGBA'))
-
-        #r = data[:, :, 0]
-        #g = data[:, :, 1]
-        #b = data[:, :, 2]
-        a = im_data[:, :, 3]
-
-        # (r < 255) | (g < 255) | (b < 255) #(r > 0) & (r == g) & (r == b) & (g == b)
-        black_areas = (a > 0)
-
-        d = im_data[np.where(black_areas)]
-        d[:, 0:3] = [64, 64, 64]
-        im_data[np.where(black_areas)] = d
-
-        im2 = Image.fromarray(im_data)
-        im2.save('edges.png', 'png')
-
-        # overlay edges on top of original image to highlight cluster
-        # enable if edges desired
-        im1.paste(im2, (0, 0), im2)
-        im1.save(out, 'png')
-
 
 def genes_expr_outline(data,
                        tsne,
